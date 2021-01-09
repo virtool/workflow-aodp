@@ -15,7 +15,8 @@ def db():
 
 
 @fixture
-async def params(db, job_args, analysis_path, index_path, sample_path, temp_analysis_path, data_path, reads_path, raw_path, temp_cache_path, temp_path_str):
+async def params(db, job_args, analysis_path, index_path, sample_path, temp_analysis_path, data_path, reads_path,
+                 raw_path, temp_cache_path, temp_path_str):
     logger.debug("Retrieving job parameters")
 
     # The document for the sample being analyzed. Assigned after database connection is made.

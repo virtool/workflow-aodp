@@ -17,10 +17,7 @@ logger = logging.getLogger(__name__)
 
 @startup
 async def make_analysis_dir(params, run_in_executor):
-    """
-    Make a directory for the analysis in the sample/analysis directory.
-
-    """
+    """Make a directory for the analysis in the sample/analysis directory."""
     await run_in_executor(os.mkdir, params["temp_analysis_path"])
     await run_in_executor(os.mkdir, params["raw_path"])
     await run_in_executor(os.mkdir, params["reads_path"])
@@ -28,10 +25,7 @@ async def make_analysis_dir(params, run_in_executor):
 
 @step
 async def join_reads(params, proc, run_subprocess, results):
-    """
-    Join overlapping paired reads into single reads.
-
-    """
+    """Join overlapping paired reads into single reads."""
     max_overlap = round(0.65 * params["sample_read_length"])
 
     command = [
@@ -58,10 +52,7 @@ async def join_reads(params, proc, run_subprocess, results):
 
 @step
 async def deduplicate_reads(params, run_in_executor):
-    """
-    Remove duplicate reads. Store the counts for unique reads.
-
-    """
+    """Remove duplicate reads. Store the counts for unique reads."""
     joined_path = params["temp_analysis_path"] / "flash.extendedFrags.fast"
     output_path = params["temp_analysis_path"] / "unique.fa"
 
@@ -76,10 +67,7 @@ async def deduplicate_reads(params, run_in_executor):
 
 @step
 async def aodp(params, proc, run_subprocess, results):
-    """
-    Run AODP, parse the ouput, and update the .
-
-    """
+    """Run AODP, parse the ouput, and update the ."""
     cwd = params["temp_analysis_path"]
 
     aodp_output_path = params["aodp_output_path"]
@@ -145,10 +133,7 @@ async def aodp(params, proc, run_subprocess, results):
 
 @step
 async def import_results(db, params, results):
-    """
-    Import the analysis results to the database.
-
-    """
+    """Import the analysis results to the database."""
     analysis_id = params["analysis_id"]
     sample_id = params["sample_id"]
 

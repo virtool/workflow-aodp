@@ -1,7 +1,6 @@
-import asyncio
 import collections
 import pathlib
-from typing import Optional, Generator
+from typing import Generator
 
 import aiofiles
 import virtool_core.caches
@@ -47,31 +46,6 @@ async def get_sequence_otu_map(db, settings, manifest) -> dict:
                 sequence_otu_map[sequence_id] = patched["_id"]
 
         return sequence_otu_map
-
-
-async def find_and_wait(db, sample_id: str, program: str, parameters: dict) -> Optional[dict]:
-    """
-    Find a cache matching the passed `sample_id`, `program` name and version, and set of trimming `parameters`. Wait
-    for the cache to be ready if it is still being created.
-
-    If no matching cache exists, `None` will be returned.
-
-    :param db: the application database interface
-    :param sample_id: the id of the parent sample
-    :param program: the program and version used to create the cache
-    :param parameters: the parameters used for the trim
-    :return: a cache document
-    """
-    document = await virtool_core.caches.db.find(db, sample_id, program, parameters)
-
-    if document:
-        cache_id = document["id"]
-
-        while document["ready"] is False:
-            await asyncio.sleep(2)
-            document = virtool_core.db.utils.base_processor(await db.caches.find_one(cache_id))
-
-        return virtool_core.db.utils.base_processor(document)
 
 
 async def parse_flash_histogram(path: pathlib.Path):

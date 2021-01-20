@@ -15,14 +15,6 @@ AODP_OLIGO_SIZE = 8
 logger = logging.getLogger(__name__)
 
 
-@startup
-async def make_analysis_dir(params, run_in_executor):
-    """Make a directory for the analysis in the sample/analysis directory."""
-    await run_in_executor(os.mkdir, params["temp_analysis_path"])
-    await run_in_executor(os.mkdir, params["raw_path"])
-    await run_in_executor(os.mkdir, params["reads_path"])
-
-
 @step
 async def join_reads(params, proc, run_subprocess, results):
     """Join overlapping paired reads into single reads."""

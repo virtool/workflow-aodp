@@ -12,6 +12,7 @@ PACKAGES = find_packages(exclude="tests")
 
 INSTALL_REQUIRES = [
     "aiofiles==0.6.0",
+    "biopython==1.78",
     "virtool-core==0.1.1",
     "virtool-workflow==0.4.0"
 ]

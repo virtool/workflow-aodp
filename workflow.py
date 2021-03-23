@@ -1,11 +1,12 @@
 import logging
-import os
+from pathlib import Path
+from typing import List
 
 import aiofiles
 import virtool_core.samples.db
 import virtool_core.utils
-import virtool_workflow.analysis.cache
-from virtool_workflow import startup, step, cleanup
+from virtool_workflow import step
+from virtool_workflow.analysis.indexes import Index
 
 import utils
 
@@ -16,24 +17,33 @@ logger = logging.getLogger(__name__)
 
 
 @step
-async def join_reads(params, proc, run_subprocess, results):
-    """Join overlapping paired reads into single reads."""
-    max_overlap = round(0.65 * params["sample_read_length"])
+async def join_reads(
+        joined_path: Path,
+        proc: int,
+        run_subprocess,
+        results: dict,
+        sample,
+        work_path: Path
+):
+    """
+    Join overlapping paired reads into single reads.
+
+    """
+    max_overlap = round(0.65 * sample.read_length)
 
     command = [
         "flash",
         "--max-overlap", str(max_overlap),
-        "-d", params["temp_analysis_path"],
+        "-d", work_path,
         "-o", "flash",
         "-t", str(proc - 1),
-        *params["read_paths"]
+        sample.read_paths
     ]
 
     await run_subprocess(command)
 
-    joined_path = params["temp_analysis_path"] / "flash.extendedFrags.fastq"
-    remainder_path = params["temp_analysis_path"] / "flash.notCombined_1.fastq"
-    hist_path = params["temp_analysis_path"] / "flash.hist"
+    hist_path = work_path / "flash.hist"
+    remainder_path = work_path / "flash.notCombined_1.fastq"
 
     results.update({
         "join_histogram": await utils.parse_flash_histogram(hist_path),
@@ -43,45 +53,58 @@ async def join_reads(params, proc, run_subprocess, results):
 
 
 @step
-async def deduplicate_reads(params, run_in_executor):
+async def deduplicate_reads(
+        run_in_executor,
+        joined_path: Path,
+        results: dict,
+        unique_path: Path,
+        work_path: Path
+):
     """Remove duplicate reads. Store the counts for unique reads."""
-    joined_path = params["temp_analysis_path"] / "flash.extendedFrags.fast"
-    output_path = params["temp_analysis_path"] / "unique.fa"
-
     counts = await run_in_executor(
         utils.run_deduplication,
         joined_path,
-        output_path
+        unique_path
     )
 
-    params["intermediate"]["sequence_counts"] = counts
+    results["sequence_counts"] = counts
 
 
 @step
-async def aodp(params, proc, run_subprocess, results):
-    """Run AODP, parse the ouput, and update the ."""
-    cwd = params["temp_analysis_path"]
+async def aodp(
+        proc: int,
+        indexes: List[Index],
+        run_subprocess,
+        results: dict,
+        unique_path: Path,
+        work_path: Path
+):
+    """
+    Run AODP, parse the output, and update the.
 
-    aodp_output_path = params["aodp_output_path"]
-    base_name = params["temp_analysis_path"] / "aodp"
-    target_path = params["temp_analysis_path"] / "unique.fa"
+    TODO: Upload data and finalize analysis
+
+    """
+    aodp_path = work_path / "aodp.out"
+    base_name = work_path / "aodp"
+    index_path = indexes[0].fasta_path
 
     command = [
         "aodp",
         f"--basename={base_name}",
         f"--threads={proc}",
         f"--oligo-size={AODP_OLIGO_SIZE}",
-        f"--match={target_path}",
-        f"--match-output={aodp_output_path}",
+        f"--match={unique_path}",
+        f"--match-output={aodp_path}",
         f"--max-homolo={AODP_MAX_HOMOLOGY}",
-        params["temp_index_path"]
+        index_path
     ]
 
-    await run_subprocess(command, cwd=cwd)
+    await run_subprocess(command, cwd=work_path)
 
     parsed = list()
 
-    async with aiofiles.open(params["aodp_output_path"], "r") as f:
+    async with aiofiles.open(aodp_path, "r") as f:
         async for line in f:
             split = line.rstrip().split("\t")
             assert len(split) == 7
@@ -102,8 +125,8 @@ async def aodp(params, proc, run_subprocess, results):
 
             sequence_id = split[1]
 
-            otu_id = params["sequence_otu_map"][sequence_id]
-            otu_version = params["manifest"][otu_id]
+            otu_id = indexes[0].get_otu_id_by_sequence_id(sequence_id)
+            otu_version = indexes[0].get_otu_version_by_sequence_id(sequence_id)
 
             parsed.append({
                 "id": read_id,
@@ -113,37 +136,11 @@ async def aodp(params, proc, run_subprocess, results):
                 "read_length": int(split[4]),
                 "min_cluster": int(split[5]),
                 "max_cluster": int(split[6]),
-                "count": params["intermediate"]["sequence_counts"][read_id],
+                "count": results["sequence_counts"][read_id],
                 "otu": {
                     "version": otu_version,
                     "id": otu_id
                 }
             })
 
-    results["results"] = parsed
-
-
-@step
-async def import_results(db, params, results):
-    """Import the analysis results to the database."""
-    analysis_id = params["analysis_id"]
-    sample_id = params["sample_id"]
-
-    # Update the database document with the small data.
-    await db.analyses.update_one({"_id": analysis_id}, {
-        "$set": {
-            **results,
-            "ready": True
-        }
-    })
-
-    await virtool_core.samples.db.recalculate_workflow_tags(db, sample_id)
-
-
-@cleanup
-async def delete_analysis(params):
-    await virtool_workflow.analysis.cache.delete_analysis(
-        params["analysis_id"],
-        params["analysis_path"],
-        params["sample_id"]
-    )
+    results["hits"] = parsed

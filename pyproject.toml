@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "\"vt-workflow-aodp\""
+version = "0.1.0"
+description = "A workflow for using amplicon analysis in Virtool using AODP."
+authors = ["Jake Alexander"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+aiofiles = ">=0.6.0"
+biopython = "=1.79"
+virtool-core = ">=0.3.0"
+virtool-workflow = "0.6.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

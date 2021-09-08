@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import List
 
 import aiofiles
-import virtool_core.samples.db
 import virtool_core.utils
 from virtool_workflow import step
 from virtool_workflow.analysis.indexes import Index
